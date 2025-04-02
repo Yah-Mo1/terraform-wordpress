@@ -1,196 +1,102 @@
-# AWS Infrastructure Setup for WordPress using Terraform
+# 🚀 WordPress Deployment on AWS using Terraform
 
-This document provides a breakdown of the Terraform configuration files required to set up a basic AWS infrastructure for running a WordPress application.
-
-## Overview
-
-The project includes the following AWS resources:
-
-1. **VPC (Virtual Private Cloud)**: A virtual network for isolating resources.
-2. **Subnet**: A public subnet to launch instances in.
-3. **Internet Gateway**: To allow instances in the public subnet to access the internet.
-4. **Security Group**: To control access to the WordPress instance.
-5. **EC2 Instance**: A WordPress application running on an EC2 instance.
-6. **Route Table**: To route traffic between the internet and resources in the VPC.
-
-## Structure
-
-The configuration is organized in three parts:
-
-1. **VPC Module**
-2. **EC2 Module**
-3. **Main Configuration**
+This project deploys a WordPress application on AWS using **Terraform**, with infrastructure built from scratch. It provisions a secure and scalable environment using EC2, RDS, and other AWS resources.
 
 ---
 
-## 1. VPC Module Configuration
+## 📦 Stack
 
-The `vpc` module creates the Virtual Private Cloud (VPC) and associated resources.
+- **Terraform**
+- **AWS EC2** (Ubuntu 22.04) for hosting WordPress
+- **AWS RDS** (MySQL) for the database
+- **Apache2** and **PHP 8.1** for the application server
+- **User Data Script** for automated instance provisioning
 
-### Resources:
+---
 
-- **aws_vpc**: Creates the VPC with a CIDR block.
-- **aws_subnet**: Creates a public subnet in the VPC.
-- **aws_internet_gateway**: Establishes an internet gateway for internet access.
-- **aws_route_table**: Configures a route table for the public subnet.
-- **aws_route_table_association**: Associates the route table with the public subnet.
+## 🏗️ Architecture
 
-### Code:
+## !["architecture](./architecture.png)
 
-```hcl
-resource "aws_vpc" "vpc" {
-  cidr_block = var.vpc_cidr
-}
+## ⚙️ Components Deployed
 
-resource "aws_subnet" "public_subnet" {
-  vpc_id = aws_vpc.vpc.id
-  cidr_block = var.public_subnet_cidr
-  availability_zone = "eu-west-2a"
-  map_public_ip_on_launch = true
-}
+- VPC with Public Subnet
+- Internet Gateway and Route Tables
+- Security Groups for EC2 and RDS
+- EC2 instance with Ubuntu 22.04
+- RDS MySQL instance
+- Bootstrap script to install WordPress
 
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.vpc.id
-}
+---
 
-resource "aws_route_table" "public_route_table" {
-  vpc_id = aws_vpc.vpc.id
+## 🚀 Getting Started
 
-  route {
-    cidr_block = var.cidr_block
-    gateway_id = aws_internet_gateway.igw.id
-  }
+### ✅ Prerequisites
 
-  tags = {
-    Name = "Public"
-  }
-}
+- [Terraform CLI](https://developer.hashicorp.com/terraform/downloads)
+- AWS CLI configured with IAM permissions
+- A key pair to SSH into EC2
+- Basic knowledge of Terraform and AWS
 
-resource "aws_route_table_association" "public_route_assoc" {
-  subnet_id = aws_subnet.public_subnet.id
-  route_table_id = aws_route_table.public_route_table.id
-}
+---
+
+### 🔧 Setup
+
+1. **Clone the repository**
+
+```
+git clone https://github.com/yourusername/wordpress-terraform.git
+cd wordpress-terraform
 ```
 
-### Purpose:
+2. **Configure variables**  
+   Create and Edit terraform.tfvars or set these in variables.tf:
 
-- **VPC**: Defines a network for your AWS resources with a CIDR block.
-- **Public Subnet**: A subnet that is accessible from the internet.
-- **Internet Gateway**: Provides internet access to resources in the public subnet.
-- **Route Table**: Ensures that traffic from the public subnet can access the internet through the gateway.
-
----
-
-## 2. EC2 Module Configuration
-
-The `ec2` module provisions an EC2 instance that will run WordPress. It configures the instance's security group, access key, and AMI.
-
-### Resources:
-
-- **aws_security_group**: Creates a security group allowing traffic on HTTP (port 80).
-- **aws_key_pair**: Fetches an existing key pair for SSH access to the instance.
-- **aws_ami**: Selects the AMI for WordPress (Bitnami WordPress in this case).
-- **aws_instance**: Creates the EC2 instance using the selected AMI and instance type.
-
-### Code:
-
-````
-```hcl
-resource "aws_security_group" "wordpress_sg" {
-  name        = "wordpress_sg"
-  description = "Allow web and SSH traffic"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr_blocks
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = var.allowed_cidr_blocks
-  }
-}
-
-data "aws_key_pair" "key" {
-  key_name = "wordpress-key"
-}
-
-data "aws_ami" "wordpress" {
-  filter {
-    name   = "name"
-    values = ["bitnami-wordpresspro-6.5.3-5-r05-linux-debian-12-x86_64-hvm-ebs-nami"]
-  }
-  filter {
-    name   = "root-device-type"
-    values = ["ebs"]
-  }
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
-
-resource "aws_instance" "wordpress" {
-  ami                    = "${data.aws_ami.wordpress.id}"
-  instance_type          = var.instance_type
-  subnet_id              = var.subnet_id
-  vpc_security_group_ids = [aws_security_group.wordpress_sg.id]
-  key_name               = data.aws_key_pair.key.key_name
-}
-
-````
-
-### Purpose:
-
-- **Security Group**: Allows HTTP (port 80) traffic to the WordPress EC2 instance.
-- **Key Pair**: Provides SSH access to the instance for management.
-- **AMI**: Specifies the Bitnami WordPress AMI for launching the EC2 instance.
-- **EC2 Instance**: The WordPress instance that is launched in the specified VPC and subnet.
-
----
-
-## 3. Main Configuration
-
-The `main.tf` file ties together the VPC and EC2 modules and passes the necessary variables.
-
-### Code:
-
-```hcl
-module "vpc" {
-  source             = "./modules/vpc"
-  vpc_cidr           = var.vpc_cidr
-  public_subnet_cidr = var.public_subnet_cidr
-  cidr_block         = var.cidr_block
-}
-
-module "ec2" {
-  source      = "./modules/ec2"
-  vpc_id      = module.vpc.vpc_id
-  subnet_id   = module.vpc.subnet_id
-  instance_type = var.instance_type
-}
+```
+aws_region = "eu-west-1"
+db_name = "wordpress"
+db_user = "admin"
+db_password = "yourpassword"
+key_name = "your-keypair-name"
 ```
 
-### Purpose:
+3. **Initialise Terraform**
 
-- The `main.tf` file initializes the `vpc` and `ec2` modules and passes the required variables for creating the VPC, subnet, and EC2 instance.
-- It ensures the EC2 instance is launched in the subnet created by the `vpc` module.
+```
+terraform init
+```
 
----
+4. **Preview the plan**
 
-## Conclusion
+```
+terraform plan
+```
 
-By running this Terraform configuration, you will set up a simple infrastructure in AWS that includes:
+5.  **Deploy the infrastructure**
 
-- A VPC with a public subnet.
-- An EC2 instance running WordPress.
-- Security group configurations for web traffic (HTTP) and SSH access.
+```
+terraform apply -auto-approve
+```
 
-This setup is ideal for deploying a basic WordPress website using a Bitnami image on AWS.
+## 🌐 Accessing WordPress
 
-![image](./wordpress.png)
+After deployment, Terraform will output the public IP of the EC2 instance. Open it in a browser:
+
+**_http://IP_**
+
+You should see the WordPress installation screen.
+
+## 🔐 Security Notes
+Allow only port 80 (HTTP) to the world
+
+Restrict SSH (port 22) to your own IP
+
+Use Secrets Manager or SSM Parameter Store to manage DB credentials in production
+
+## 🧹 Cleanup
+
+6. **To delete all resources:**
+
+```
+terraform destroy
+```

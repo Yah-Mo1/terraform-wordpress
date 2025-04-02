@@ -21,6 +21,19 @@ resource "aws_subnet" "public_subnet" {
 
 }
 
+resource "aws_subnet" "public_subnet_2" {
+
+
+  vpc_id = aws_vpc.vpc.id
+
+  cidr_block = "10.0.2.0/24"
+
+  availability_zone = "eu-west-2b"
+
+  map_public_ip_on_launch = true
+
+}
+
 # Define internet gateway 
 
 resource "aws_internet_gateway" "igw" {
@@ -63,3 +76,15 @@ resource "aws_route_table_association" "public_route_assoc" {
 
 }
 
+
+
+## Subnet groups for the database RDS 
+
+resource "aws_db_subnet_group" "rds-subnet-group" {
+  name       = "db-subnet-group"
+  subnet_ids = [aws_subnet.public_subnet.id, aws_subnet.public_subnet_2.id]
+
+  tags = {
+    Name = "Wordpress DB Subnet group"
+  }
+}

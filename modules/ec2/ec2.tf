@@ -4,12 +4,13 @@ resource "aws_security_group" "wordpress_sg" {
   description = "Allow web and SSH traffic"
   vpc_id      = var.vpc_id
 
-#  ingress {
-#     from_port   = 22
-#     to_port     = 22
-#     protocol    = "tcp"
-#     cidr_blocks = var.allowed_cidr_blocks
-#   }
+//Check to see if SSH is allowed
+ ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_cidr_blocks
+  }
 
 
     ingress {
@@ -34,28 +35,35 @@ data "aws_key_pair" "key" {
 
 }
 
-
-data "aws_ami" "wordpress" {
-  filter {
-    name   = "name"
-    values = ["bitnami-wordpresspro-6.5.3-5-r05-linux-debian-12-x86_64-hvm-ebs-nami"]
-  }
-  filter {
-    name   = "root-device-type"
-    values = ["ebs"]
-  }
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
-
-
 resource "aws_instance" "wordpress" {
-  ami                    = "${data.aws_ami.wordpress.id}"
+  ami                    = "ami-04da26f654d3383cf"
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id 
   vpc_security_group_ids = [aws_security_group.wordpress_sg.id]
+
+
+connection { 
+
+    type        = "ssh" 
+
+    user        = "ubuntu" 
+
+    private_key = file("~/.sshkey/wordpress-key.pem") # Update with your private key file path 
+
+    host        = self.public_ip 
+
+  } 
+
   key_name               = data.aws_key_pair.key.key_name
 
+  user_data = templatefile("${path.module}/userdata.sh.tpl", {
+    db_name     = var.db_name
+    db_user     = var.db_user
+    db_password = var.db_password
+    db_host     = var.db_host
+  })
+
+  tags = {
+    Name = "WordPress-Instance"
+  }
 }
